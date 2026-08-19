@@ -1,0 +1,13 @@
+node_modules
+dist
+.output
+.vercel
+.tanstack
+.nitro
+*.log
+.env
+.env.*
+.DS_Store
+screenshots
+artifacts
+orrery.zip
