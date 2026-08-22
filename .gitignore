@@ -7,7 +7,9 @@ dist
 *.log
 .env
 .env.*
+!.env.example
 .DS_Store
 screenshots
 artifacts
 orrery.zip
+.node_modules.lock

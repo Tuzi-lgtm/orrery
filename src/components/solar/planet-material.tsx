@@ -37,6 +37,7 @@ export function PlanetMaterial({
   roughness,
   gas,
   atmosphere,
+  refDist,
 }: {
   map: Texture;
   bumpMap?: Texture | null;
@@ -44,14 +45,17 @@ export function PlanetMaterial({
   roughness: number;
   gas: boolean;
   atmosphere: boolean;
+  refDist: number;
 }) {
   const extras = useMemo(
     () => ({
       uGas: { value: gas ? 1 : 0 },
       uAtmos: { value: atmosphere ? 1 : 0 },
+      uRefDist: { value: refDist },
     }),
-    [gas, atmosphere],
+    [gas, atmosphere, refDist],
   );
+  extras.uRefDist.value = refDist;
 
   return (
     <meshStandardMaterial
@@ -63,19 +67,20 @@ export function PlanetMaterial({
       onBeforeCompile={(shader) => {
         shader.uniforms.uGas = extras.uGas;
         shader.uniforms.uAtmos = extras.uAtmos;
+        shader.uniforms.uRefDist = extras.uRefDist;
         shader.vertexShader = shader.vertexShader
           .replace(
             "#include <common>",
-            `#include <common>\nvarying vec3 vObjPos;`,
+            `#include <common>\nvarying vec3 vObjPos;\nvarying vec3 vWorldPos;`,
           )
           .replace(
             "#include <begin_vertex>",
-            `#include <begin_vertex>\nvObjPos = normalize(position);`,
+            `#include <begin_vertex>\nvObjPos = normalize(position);\nvWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
           );
         shader.fragmentShader = shader.fragmentShader
           .replace(
             "#include <common>",
-            `#include <common>\nvarying vec3 vObjPos;\nuniform float uGas;\nuniform float uAtmos;\n${NOISE}`,
+            `#include <common>\nvarying vec3 vObjPos;\nvarying vec3 vWorldPos;\nuniform float uGas;\nuniform float uAtmos;\nuniform float uRefDist;\n${NOISE}`,
           )
           .replace(
             "#include <normal_fragment_maps>",
@@ -95,7 +100,10 @@ export function PlanetMaterial({
           )
           .replace(
             "#include <opaque_fragment>",
-            `#include <opaque_fragment>
+            `float sunD = max(length(vWorldPos), 0.4);
+             float inner = smoothstep(uRefDist * 1.08, uRefDist * 0.48, sunD);
+             outgoingLight *= mix(1.0, 0.26, inner);
+             #include <opaque_fragment>
              if (uAtmos > 0.5) {
                float fres = pow(1.0 - max(dot(normalize(normal), normalize(vViewPosition)), 0.0), 2.5);
                gl_FragColor.rgb += vec3(0.22, 0.42, 0.95) * fres * 0.42;
@@ -103,7 +111,7 @@ export function PlanetMaterial({
             `,
           );
       }}
-      customProgramCacheKey={() => `planet-${gas ? 1 : 0}-${atmosphere ? 1 : 0}`}
+      customProgramCacheKey={() => `planet-${gas ? 1 : 0}-${atmosphere ? 1 : 0}-dim2`}
     />
   );
 }

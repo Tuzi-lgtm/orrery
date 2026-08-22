@@ -16,6 +16,7 @@ import {
 import {
   PLANETS,
   SUN,
+  EARTH,
   bodyOrbit,
   bodyRadius,
   orbitPoint,
@@ -47,11 +48,11 @@ function useDisposableTexture(factory: () => Texture) {
 }
 
 export function SimulationClock() {
-  const paused = useSolar((s) => s.paused);
-  const speed = useSolar((s) => s.speed);
   useFrame((_, delta) => {
+    const { paused, speed } = useSolar.getState();
     const d = Math.min(delta, 0.1);
-    if (!paused) simTimeRef.current += d * speed;
+    if (paused) return;
+    simTimeRef.current += d * speed;
   }, -2);
   return null;
 }
@@ -205,9 +206,10 @@ export function Planet({ body }: { body: BodyDef }) {
             map={tex}
             bumpMap={rocky ? bump : null}
             bumpScale={rocky ? 0.055 : 0}
-            roughness={rocky ? 0.78 : 0.48}
+            roughness={rocky ? 0.82 : 0.48}
             gas={body.kind === "gas-giant" || body.kind === "ice-giant"}
             atmosphere={body.id === "earth"}
+            refDist={bodyOrbit(EARTH, scaleMode)}
           />
         </mesh>
         {body.id === "earth" ? (
@@ -324,8 +326,9 @@ function BodyLabel({
 }) {
   const show = useSolar((s) => s.showLabels);
   const selectedId = useSolar((s) => s.selectedId);
+  const galaxyView = useSolar((s) => s.galaxyView);
   const select = useSolar((s) => s.select);
-  if (!show) return null;
+  if (!show || galaxyView) return null;
   if (selectedId && selectedId !== id) return null;
   const lift = radius + Math.max(0.22, radius * 0.18);
   return (

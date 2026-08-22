@@ -15,7 +15,51 @@ npm run dev
 
 Then open [http://localhost:8080](http://localhost:8080) on this computer.
 
-## Try it on an iPhone
+## Deploy to Vercel (iPhone, no PC left on)
+
+The project is already set up for Vercel. Easiest path if you have GitHub:
+
+### GitHub + Vercel
+
+In PowerShell, in `F:\AI\Grok\GrokBuild\orrery`:
+
+```powershell
+git init
+git add .
+git commit -m "Orrery"
+gh repo create orrery --public --source=. --remote=origin --push
+```
+
+If you don’t have `gh`, create an empty repo at [github.com/new](https://github.com/new), then:
+
+```powershell
+git init
+git add .
+git commit -m "Orrery"
+git branch -M main
+git remote add origin https://github.com/YOUR_USER/orrery.git
+git push -u origin main
+```
+
+Then:
+
+1. Open [vercel.com/new](https://vercel.com/new)
+2. Import the `orrery` repo
+3. Leave the defaults (build is `npm run build`)
+4. Click **Deploy**
+
+You’ll get `https://orrery-xxxx.vercel.app`. Open it on the iPhone. Share → **Add to Home Screen**. Later pushes to `main` redeploy automatically.
+
+No `DATABASE_URL` needed.
+
+### Or just the Vercel CLI
+
+```powershell
+npx vercel login
+npx vercel
+npx vercel --prod
+```
+## Try it on an iPhone (local PC still running)
 
 The zip is the source — iPhone Safari cannot run `npm` itself. Start the app on your computer, then open it from the phone on the **same Wi‑Fi**.
 
