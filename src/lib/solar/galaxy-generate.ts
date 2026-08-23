@@ -134,18 +134,18 @@ function placeArm(i: number, seed: number, u: number, v: number, pitch: number) 
     dim *= 0.15 + lane;
   }
 
-  if (hash(i, seed + 70) > 0.88) {
+  if (hash(i, seed + 70) > 0.94) {
     const cid = Math.floor(hash(i, seed + 71) * 180);
     const cu = hash(cid, seed + 210 + Math.floor(nOff));
     const cR = GALAXY_BAR_LEN + cu * (GALAXY_RADIUS - GALAXY_BAR_LEN) * (spur ? 0.55 : 1);
     const cTh =
       GALAXY_ARM_ROT + arm + Math.log(Math.max(cR, 10) / GALAXY_BAR_LEN) / (pitch * pitchMul);
-    const rad = 22 + hash(cid, seed + 212) * 40;
+    const rad = 8 + hash(cid, seed + 212) * 16;
     r = cR + (hash(i, seed + 72) - 0.5) * 2 * rad;
     theta = cTh + (hash(i, seed + 73) - 0.5) * (rad / Math.max(cR, 50));
     spread = (hash(i, seed + 74) - 0.5) * rad * 0.9;
     knot = true;
-    dim = 0.7 + hash(i, seed + 75) * 0.5;
+    dim = 0.5 + hash(i, seed + 75) * 0.32;
   }
 
   if (hash(i, seed + 63) > 0.9) {
@@ -202,8 +202,9 @@ export function makeCloud(count: number, kind: CloudKind, seed: number): CloudBu
       const along0 = 0.22 + Math.pow(hash(aid, 302), 0.9) * 0.68;
       const aR = GALAXY_BAR_LEN + along0 * (GALAXY_RADIUS - GALAXY_BAR_LEN);
       const aTh = GALAXY_ARM_ROT + armAng + Math.log(Math.max(aR, 10) / GALAXY_BAR_LEN) / pitch;
-      const aRad = 4 + Math.pow(hash(aid, 303), 2.4) * 36;
-      const stretch = 1.4 + Math.pow(hash(aid, 305), 1.5) * 5.5;
+      const aRad = 4 + Math.pow(hash(aid, 303), 2.4) * 26;
+      // was *5.5, which smeared associations into ~35deg arcs across the disc
+      const stretch = 1.1 + Math.pow(hash(aid, 305), 1.5) * 0.85;
       const u1 = Math.max(hash(i, seed + 55), 1e-4);
       const u2 = hash(i, seed + 56) * Math.PI * 2;
       const mag = Math.sqrt(-2 * Math.log(u1));
@@ -218,7 +219,7 @@ export function makeCloud(count: number, kind: CloudKind, seed: number): CloudBu
       else if (spec < 0.55) color.setRGB(0.62 + w * 0.12, 0.78, 1);
       else color.setRGB(1, 0.94, 0.9);
       size = 0.1 + Math.pow(q, 2.9) * 1.35;
-      bright = (0.35 + Math.pow(hash(i, seed + 58), 2.2) * 1.6) * fall;
+      bright = (0.3 + Math.pow(hash(i, seed + 58), 2.2) * 1.15) * fall;
     } else if (n < 0.1) {
       r = Math.pow(u, 0.52) * GALAXY_RADIUS * 0.2;
       theta = v * Math.PI * 2;

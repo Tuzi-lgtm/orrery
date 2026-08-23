@@ -181,24 +181,24 @@ void main() {
   float armDist = min(d0, d1);
   float knots = mix(0.32, 1.0, pow(nShape, 1.55));
   knots *= mix(0.72, 1.12, nMid);
-  float core = exp(-pow(armDist / 0.42, 2.0));
-  float halo = exp(-pow(armDist / 1.12, 2.0));
-  float major = (halo * 0.5 + core * 1.15) * knots;
+  float core = exp(-pow(armDist / 0.58, 2.0));
+  float halo = exp(-pow(armDist / 1.55, 2.0));
+  float major = (halo * 0.62 + core * 1.05) * knots;
   float d2 = abs(wrapped - 1.5707963);
   float d3 = abs(wrapped - 4.712389);
   float minor = exp(-pow(min(d2, d3) / 0.62, 2.0)) * 0.18 * nMid;
-  float lane = exp(-pow((armDist + 0.28) / 0.2, 2.0));
   vec2 bdir = vec2(cos(uBar), sin(uBar));
   float along = rest.x * bdir.x + rest.y * bdir.y;
   float perp = rest.x * bdir.y - rest.y * bdir.x;
   float bar = exp(-pow(perp / 44.0, 2.0)) * exp(-pow(along / 108.0, 2.0));
-  float radial = smoothstep(10.0, 80.0, r) * (1.0 - smoothstep(R * 0.78, R, r));
+  float radial = smoothstep(10.0, 80.0, r) * (1.0 - smoothstep(R * 0.62, R * 1.02, r));
   float bulge = exp(-pow(r / (R * 0.3), 2.0));
   bulge *= mix(0.32, 1.28, pow(nBig, 1.35));
   radial = max(radial, max(bar * 0.95, bulge));
   float inner = smoothstep(R * 0.48, R * 0.16, r);
-  float inter = (1.0 - major) * mix(0.08, 0.7, pow(nBig, 1.8));
-  float hii = pow(vn(rest * 0.09 + 6.0), 9.0) * major * (1.0 - inner * 0.5);
+  float inter = (1.0 - major) * mix(0.30, 0.95, pow(nBig, 1.35));
+  float hiiN = fbm(rest * 0.05 + 6.0) * fbm(rest * 0.145 + 19.0);
+  float hii = pow(clamp(hiiN * 2.05, 0.0, 1.0), 4.3) * major * (1.0 - inner * 0.45);
   float clump = pow(nMid, 2.6) * major;
   vec3 haze = vec3(0.08, 0.11, 0.2);
   vec3 armBlue = vec3(0.4, 0.62, 1.0);
@@ -206,18 +206,16 @@ void main() {
   vec3 armCol = mix(armBlue, armWarm, inner);
   vec3 gold = vec3(1.0, 0.78, 0.42);
   vec3 pink = vec3(1.0, 0.28, 0.48);
-  vec3 dustc = vec3(0.14, 0.07, 0.03);
   vec3 col = mix(haze, armCol, major * 0.95 + minor * 0.5);
   col = mix(col, armCol * 1.15, core * knots * 0.55);
-  col = mix(col, armCol * 0.28, inter * 0.55);
+  col = mix(col, armCol * 0.62, inter * 0.45);
   col = mix(col, mix(armCol, gold, inner), clump * 0.5);
-  col = mix(col, pink, hii * 0.45);
-  col = mix(col, dustc, lane * (0.45 + inner * 0.25));
+  col = mix(col, pink, hii * 0.92);
   col = mix(col, gold, max(bulge, bar) * 0.92);
   float scaleH = mix(12.0, 38.0, max(bulge, bar));
   float vert = exp(-abs(vRel.y) / scaleH);
   float alpha =
-    (0.07 + major * 0.36 + core * knots * 0.22 + minor * 0.1 + bulge * 0.26 + bar * 0.28 + inter * 0.05 + hii * 0.2 + clump * 0.1) *
+    (0.19 + major * 0.36 + core * knots * 0.20 + minor * 0.14 + bulge * 0.26 + bar * 0.28 + inter * 0.20 + hii * 0.42 + clump * 0.1) *
     radial * vert * uOpacity;
   alpha *= smoothstep(10.0, 26.0, length(vRel));
   if (alpha < 0.01) discard;
@@ -260,6 +258,108 @@ function GalaxyVolume({ fadeRef }: { fadeRef: { current: number } }) {
         depthTest
         side={DoubleSide}
         blending={AdditiveBlending}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+/**
+ * Dust lanes.
+ *
+ * Deliberately a separate pass with NormalBlending. Everything else in the
+ * galaxy is additive, and additive blending can only ADD light -- mixing the
+ * colour toward brown inside the additive shader still brightened the pixel,
+ * which is why this galaxy never had readable lanes. Lanes have to be able to
+ * subtract, so they are drawn last, over the star clouds they occlude.
+ */
+const DUST_FRAG = /* glsl */ `
+varying vec3 vRel;
+uniform float uTime;
+uniform float uOpacity;
+uniform float uRot;
+uniform float uPitch;
+uniform float uPattern;
+
+float dhn(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float dvn(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(dhn(i), dhn(i + vec2(1.0, 0.0)), f.x),
+             mix(dhn(i + vec2(0.0, 1.0)), dhn(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float dfbm(vec2 p) {
+  float v = 0.0, a = 0.58;
+  for (int i = 0; i < 4; i++) { v += a * dvn(p); p = p * 2.03 + vec2(11.7, 4.3); a *= 0.46; }
+  return v;
+}
+
+void main() {
+  float r = length(vRel.xz);
+  float R = 900.0;
+  if (r > R) discard;
+  float angOff = -uTime * 6.2831853 / uPattern;
+  float c = cos(angOff), s = sin(angOff);
+  vec2 rest = vec2(c * vRel.x + s * vRel.z, -s * vRel.x + c * vRel.z);
+  float ang = atan(rest.y, rest.x);
+  float nBig = dfbm(rest * 0.0075);
+  float spiral = ang - uRot - log(max(r, 1.0) / 180.0) / uPitch - 0.028 * (nBig - 0.5);
+  float wrapped = mod(spiral + 6.2831853, 6.2831853);
+
+  // SIGNED distance to the nearer arm, so the lane can sit on one side of it
+  // the way a real density-wave dust lane rides the inner edge.
+  float s0 = wrapped > 3.14159265 ? wrapped - 6.2831853 : wrapped;
+  float s1 = wrapped - 3.14159265;
+  float sArm = abs(s0) < abs(s1) ? s0 : s1;
+
+  float lane = exp(-pow((sArm + 0.17) / 0.125, 2.0));
+  lane *= mix(0.35, 1.30, dfbm(rest * 0.028 + 21.0));   // break the ribbon up
+  lane *= mix(0.70, 1.15, dfbm(rest * 0.08 + 5.0));     // fine filaments
+  float spur = exp(-pow((sArm - 0.40) / 0.11, 2.0)) * 0.30 * dfbm(rest * 0.05 + 60.0);
+
+  float floc = pow(dfbm(rest * 0.019 + 40.0), 2.1) * 0.42;
+
+  float radial = smoothstep(26.0, 120.0, r) * (1.0 - smoothstep(R * 0.66, R * 0.97, r));
+  float vert = exp(-abs(vRel.y) / 15.0);
+  float a = (lane * 0.98 + spur + floc * 0.26) * radial * vert * uOpacity;
+  if (a < 0.012) discard;
+  vec3 col = mix(vec3(0.035, 0.022, 0.020), vec3(0.15, 0.095, 0.070),
+                 dfbm(rest * 0.045 + 8.0));
+  gl_FragColor = vec4(col, clamp(a, 0.0, 0.90));
+}
+`;
+
+function GalaxyDust({ fadeRef }: { fadeRef: { current: number } }) {
+  const mat = useRef<ShaderMaterial>(null);
+  useFrame(() => {
+    if (!mat.current) return;
+    mat.current.uniforms.uTime.value = galaxyTimeRef.current;
+    mat.current.uniforms.uOpacity.value = fadeRef.current;
+  });
+  return (
+    <mesh
+      position={[GALAXY_CENTER.x, 0, GALAXY_CENTER.z]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={12}
+    >
+      <circleGeometry args={[GALAXY_RADIUS * 1.04, 96]} />
+      <shaderMaterial
+        ref={mat}
+        vertexShader={VOL_VERT}
+        fragmentShader={DUST_FRAG}
+        uniforms={{
+          uTime: { value: 0 },
+          uOpacity: { value: 1 },
+          uCenter: { value: GALAXY_CENTER_VEC },
+          uRot: { value: GALAXY_ARM_ROT },
+          uPitch: { value: GALAXY_PITCH },
+          uPattern: { value: GALAXY_PATTERN_PERIOD },
+        }}
+        transparent
+        depthWrite={false}
+        depthTest={false}
+        side={DoubleSide}
+        blending={NormalBlending}
         toneMapped={false}
       />
     </mesh>
@@ -480,6 +580,7 @@ export function MilkyWay() {
             opacity={0.7}
             fadeRef={fade}
           />
+          <GalaxyDust fadeRef={fade} />
           <BlackHole />
           <mesh position={[GALAXY_CENTER.x, 0, GALAXY_CENTER.z]} {...pick}>
             <sphereGeometry args={[36, 16, 12]} />
