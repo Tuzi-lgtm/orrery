@@ -9,6 +9,9 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
+    // Tests run under `node --test` with type stripping, so they import
+    // sibling modules by their real .ts path.
+    "allowImportingTsExtensions": true,
     "types": ["vite/client", "node"],
     "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] }
