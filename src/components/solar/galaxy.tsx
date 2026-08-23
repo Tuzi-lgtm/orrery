@@ -61,7 +61,8 @@ void main() {
   if (dist < 4.0) discard;
   vec2 uv = gl_PointCoord * 2.0 - 1.0;
   float d = dot(uv, uv);
-  float a = uOpacity * smoothstep(1.0, 0.15, d);
+  float fall = max(0.0, 1.0 - d);
+  float a = uOpacity * exp(-d * 3.4) * fall * 1.55;
   a *= smoothstep(4.0, 6.4, dist);
   if (a < 0.02) discard;
   gl_FragColor = vec4(vColor * a, a);
@@ -557,13 +558,13 @@ export function MilkyWay() {
           <BarCluster fadeRef={fade} geometry={clouds.bar} />
           <GalaxyCloud
             geometry={clouds.stars}
-            size={0.56}
+            size={0.74}
             opacity={1}
             fadeRef={fade}
           />
           <GalaxyCloud
             geometry={clouds.clusters}
-            size={0.58}
+            size={0.74}
             opacity={0.95}
             fadeRef={fade}
           />
@@ -576,7 +577,7 @@ export function MilkyWay() {
           />
           <GalaxyCloud
             geometry={clouds.core}
-            size={0.22}
+            size={0.30}
             opacity={0.7}
             fadeRef={fade}
           />

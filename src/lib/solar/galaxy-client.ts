@@ -13,7 +13,7 @@ export interface GalaxyGeometries {
 
 /** The five clouds, in the order they are dispatched. */
 const JOBS = {
-  stars: { kind: "cloud", cloud: "star", count: 280_000, seed: 4 },
+  stars: { kind: "cloud", cloud: "star", count: 340_000, seed: 4 },
   dust: { kind: "cloud", cloud: "dust", count: 42_000, seed: 19 },
   clusters: { kind: "cloud", cloud: "cluster", count: 36_000, seed: 27 },
   core: { kind: "core", count: 100_000 },
