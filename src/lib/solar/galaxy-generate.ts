@@ -77,31 +77,31 @@ function placeArm(i: number, seed: number, u: number, v: number, pitch: number) 
   if (pick < 0.44) {
     arm = 0;
     pitchMul = 1.04;
-    width = 1.25;
+    width = 1.4;
     nOff = 2.4;
   } else if (pick < 0.84) {
     arm = Math.PI;
     pitchMul = 0.9;
-    width = 1.4;
+    width = 1.55;
     nOff = 9.1;
   } else if (pick < 0.93) {
     arm = Math.PI * 0.5 + 0.18;
     major = false;
     pitchMul = 1.12;
-    width = 0.78;
+    width = 1.1;
     nOff = 14.6;
   } else if (pick < 0.975) {
     arm = Math.PI * 1.5 + 0.12;
     major = false;
     pitchMul = 0.8;
-    width = 0.7;
+    width = 1.02;
     nOff = 21.3;
   } else {
     arm = GALAXY_SUN_ANGLE - GALAXY_ARM_ROT;
     spur = true;
     major = false;
     pitchMul = 1.4;
-    width = 0.55;
+    width = 0.9;
     nOff = 27.0;
   }
 
@@ -114,7 +114,7 @@ function placeArm(i: number, seed: number, u: number, v: number, pitch: number) 
     r = GALAXY_SUN_R * (0.82 + u * 0.32);
   }
   const nv = vnoise(r * 0.015 + nOff, arm * 5.3);
-  const wiggle = (nv - 0.5) * 0.07 + (hash(i, seed + 41) - 0.5) * 0.03;
+  const wiggle = (nv - 0.5) * 0.11 + (hash(i, seed + 41) - 0.5) * 0.06;
   let theta =
     GALAXY_ARM_ROT + arm + Math.log(Math.max(r, 10) / GALAXY_BAR_LEN) / (pitch * pitchMul) + wiggle;
 
@@ -125,8 +125,13 @@ function placeArm(i: number, seed: number, u: number, v: number, pitch: number) 
   const lane = Math.pow(vnoise(r * 0.0038 + nOff * 0.25, arm * 1.7 + r * 0.0015), 1.85);
 
   const innerFat = Math.exp(-((r / (GALAXY_RADIUS * 0.4)) ** 2));
-  const edge = Math.sign(v - 0.5) * Math.pow(Math.abs(v - 0.5), 0.62);
-  let spread = edge * width * (16 + innerFat * 48 + r * 0.022 + (1 - dens) * 16);
+  const edge = Math.sign(v - 0.5) * Math.pow(Math.abs(v - 0.5), 0.5);
+  let spread = edge * width * (22 + innerFat * 58 + r * 0.03 + (1 - dens) * 20);
+  // Heavy-tailed scatter: most points stay near the ridge, a few stray far.
+  // A bounded cross-section gave the arm a crisp rim; the tail is what makes
+  // it read as gas rather than a ribbon of dots.
+  const tail = (hash(i, seed + 91) - 0.5) * 2;
+  spread += Math.sign(tail) * Math.abs(tail) ** 3.2 * 54 * width;
   let knot = dens > 0.74 && hash(i, seed + 53) > 0.78;
   let dim = (0.2 + dens * 0.75) * (0.22 + lane * 1.7);
 
@@ -134,18 +139,18 @@ function placeArm(i: number, seed: number, u: number, v: number, pitch: number) 
     dim *= 0.15 + lane;
   }
 
-  if (hash(i, seed + 70) > 0.88) {
+  if (hash(i, seed + 70) > 0.94) {
     const cid = Math.floor(hash(i, seed + 71) * 180);
     const cu = hash(cid, seed + 210 + Math.floor(nOff));
     const cR = GALAXY_BAR_LEN + cu * (GALAXY_RADIUS - GALAXY_BAR_LEN) * (spur ? 0.55 : 1);
     const cTh =
       GALAXY_ARM_ROT + arm + Math.log(Math.max(cR, 10) / GALAXY_BAR_LEN) / (pitch * pitchMul);
-    const rad = 22 + hash(cid, seed + 212) * 40;
+    const rad = 8 + hash(cid, seed + 212) * 16;
     r = cR + (hash(i, seed + 72) - 0.5) * 2 * rad;
     theta = cTh + (hash(i, seed + 73) - 0.5) * (rad / Math.max(cR, 50));
     spread = (hash(i, seed + 74) - 0.5) * rad * 0.9;
     knot = true;
-    dim = 0.7 + hash(i, seed + 75) * 0.5;
+    dim = 0.5 + hash(i, seed + 75) * 0.32;
   }
 
   if (hash(i, seed + 63) > 0.9) {
@@ -202,8 +207,9 @@ export function makeCloud(count: number, kind: CloudKind, seed: number): CloudBu
       const along0 = 0.22 + Math.pow(hash(aid, 302), 0.9) * 0.68;
       const aR = GALAXY_BAR_LEN + along0 * (GALAXY_RADIUS - GALAXY_BAR_LEN);
       const aTh = GALAXY_ARM_ROT + armAng + Math.log(Math.max(aR, 10) / GALAXY_BAR_LEN) / pitch;
-      const aRad = 4 + Math.pow(hash(aid, 303), 2.4) * 36;
-      const stretch = 1.4 + Math.pow(hash(aid, 305), 1.5) * 5.5;
+      const aRad = 4 + Math.pow(hash(aid, 303), 2.4) * 26;
+      // was *5.5, which smeared associations into ~35deg arcs across the disc
+      const stretch = 1.1 + Math.pow(hash(aid, 305), 1.5) * 0.85;
       const u1 = Math.max(hash(i, seed + 55), 1e-4);
       const u2 = hash(i, seed + 56) * Math.PI * 2;
       const mag = Math.sqrt(-2 * Math.log(u1));
@@ -218,7 +224,7 @@ export function makeCloud(count: number, kind: CloudKind, seed: number): CloudBu
       else if (spec < 0.55) color.setRGB(0.62 + w * 0.12, 0.78, 1);
       else color.setRGB(1, 0.94, 0.9);
       size = 0.1 + Math.pow(q, 2.9) * 1.35;
-      bright = (0.35 + Math.pow(hash(i, seed + 58), 2.2) * 1.6) * fall;
+      bright = (0.3 + Math.pow(hash(i, seed + 58), 2.2) * 1.15) * fall;
     } else if (n < 0.1) {
       r = Math.pow(u, 0.52) * GALAXY_RADIUS * 0.2;
       theta = v * Math.PI * 2;
@@ -242,7 +248,7 @@ export function makeCloud(count: number, kind: CloudKind, seed: number): CloudBu
       theta = a.theta;
       spread = a.spread;
       const spec = hash(i, seed + 99);
-      const flux = 0.28 + Math.pow(hash(i, seed + 101), 2.3) * 2.2;
+      const flux = 0.26 + Math.pow(hash(i, seed + 101), 2.3) * 1.5;
       const inner = 1.0 - Math.min(r / GALAXY_RADIUS, 1);
       if ((a.knot && spec < 0.35) || spec < 0.06) {
         color.setRGB(1, 0.3 + w * 0.16, 0.48 + w * 0.12);
@@ -260,6 +266,15 @@ export function makeCloud(count: number, kind: CloudKind, seed: number): CloudBu
       bright = flux * a.dim * (a.major ? 1.25 : 0.8) * (0.7 + inner * 0.5);
       if (a.knot) bright *= 1.25;
     }
+
+    // Taper the stars out in step with the volumetric glow. Without this the
+    // arms keep full brightness past the point where the haze has faded, so
+    // the outer arm tips render as a bare hard-edged arc of dots on black.
+    const rim = Math.max(
+      0,
+      Math.min(1, (GALAXY_RADIUS * 1.02 - r) / (GALAXY_RADIUS * 0.4)),
+    );
+    bright *= rim * rim;
 
     const bulge = Math.exp(-((r / (GALAXY_RADIUS * 0.2)) ** 2));
     const x = cx + Math.cos(theta) * r + Math.cos(theta + 1.57) * spread;
