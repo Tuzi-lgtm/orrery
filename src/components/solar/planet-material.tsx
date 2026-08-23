@@ -32,6 +32,7 @@ float pFbm(vec3 p) {
 
 export function PlanetMaterial({
   map,
+  fallbackColor,
   bumpMap,
   bumpScale,
   roughness,
@@ -39,7 +40,9 @@ export function PlanetMaterial({
   atmosphere,
   refDist,
 }: {
-  map: Texture;
+  /** Absent until the texture worker delivers it. */
+  map?: Texture | null;
+  fallbackColor: string;
   bumpMap?: Texture | null;
   bumpScale: number;
   roughness: number;
@@ -59,7 +62,15 @@ export function PlanetMaterial({
 
   return (
     <meshStandardMaterial
-      map={map}
+      // Remount when the map arrives. The material is first compiled without
+      // one (the worker has not delivered yet), so the program has no USE_MAP;
+      // three does not recompile just because .map was assigned later, and the
+      // texture would never be sampled -- planets stayed flat white.
+      key={map ? "mapped" : "flat"}
+      map={map ?? undefined}
+      // three multiplies map by color, so the tint has to be white once the
+      // map is in -- otherwise every surface would be shaded twice.
+      color={map ? "#ffffff" : fallbackColor}
       bumpMap={bumpMap ?? undefined}
       bumpScale={bumpScale}
       roughness={roughness}
@@ -111,7 +122,9 @@ export function PlanetMaterial({
             `,
           );
       }}
-      customProgramCacheKey={() => `planet-${gas ? 1 : 0}-${atmosphere ? 1 : 0}-dim2`}
+      customProgramCacheKey={() =>
+        `planet-${gas ? 1 : 0}-${atmosphere ? 1 : 0}-${map ? 1 : 0}-dim2`
+      }
     />
   );
 }

@@ -1,6 +1,6 @@
 import { Html, Line } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -749,20 +749,32 @@ export function MilkyWay() {
   const fade = useRef(0);
   const pick = usePick(() => selectSgrA(!sgrASelected));
 
-  const stars = useMemo(() => makeCloud(280000, "star", 4), []);
-  const dust = useMemo(() => makeCloud(42000, "dust", 19), []);
-  const clusters = useMemo(() => makeCloud(36000, "cluster", 27), []);
-  const core = useMemo(() => makeCore(100000), []);
+  // ~460k points, ~590ms of generation. Nobody pays for it until they open
+  // this view; before that MilkyWay is an empty invisible group.
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (visible) setArmed(true);
+  }, [visible]);
 
-  useEffect(
-    () => () => {
-      stars.dispose();
-      dust.dispose();
-      clusters.dispose();
-      core.dispose();
-    },
-    [stars, dust, clusters, core],
+  const clouds = useMemo(
+    () =>
+      armed
+        ? {
+            stars: makeCloud(280000, "star", 4),
+            dust: makeCloud(42000, "dust", 19),
+            clusters: makeCloud(36000, "cluster", 27),
+            core: makeCore(100000),
+          }
+        : null,
+    [armed],
   );
+
+  useEffect(() => {
+    if (!clouds) return;
+    return () => {
+      for (const geometry of Object.values(clouds)) geometry.dispose();
+    };
+  }, [clouds]);
 
   useFrame((_, delta) => {
     const d = Math.min(delta, 0.1);
@@ -799,28 +811,42 @@ export function MilkyWay() {
 
   return (
     <group ref={group} visible={false}>
-      <GalaxyVolume fadeRef={fade} />
-      <BarCluster fadeRef={fade} />
-      <GalaxyCloud geometry={stars} size={0.56} opacity={1} fadeRef={fade} />
-      <GalaxyCloud
-        geometry={clusters}
-        size={0.58}
-        opacity={0.95}
-        fadeRef={fade}
-      />
-      <GalaxyCloud
-        geometry={dust}
-        size={1.55}
-        opacity={0.22}
-        fadeRef={fade}
-        additive={false}
-      />
-      <GalaxyCloud geometry={core} size={0.22} opacity={0.7} fadeRef={fade} />
-      <BlackHole />
-      <mesh position={[GALAXY_CENTER.x, 0, GALAXY_CENTER.z]} {...pick}>
-        <sphereGeometry args={[36, 16, 12]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
+      {clouds ? (
+        <>
+          <GalaxyVolume fadeRef={fade} />
+          <BarCluster fadeRef={fade} />
+          <GalaxyCloud
+            geometry={clouds.stars}
+            size={0.56}
+            opacity={1}
+            fadeRef={fade}
+          />
+          <GalaxyCloud
+            geometry={clouds.clusters}
+            size={0.58}
+            opacity={0.95}
+            fadeRef={fade}
+          />
+          <GalaxyCloud
+            geometry={clouds.dust}
+            size={1.55}
+            opacity={0.22}
+            fadeRef={fade}
+            additive={false}
+          />
+          <GalaxyCloud
+            geometry={clouds.core}
+            size={0.22}
+            opacity={0.7}
+            fadeRef={fade}
+          />
+          <BlackHole />
+          <mesh position={[GALAXY_CENTER.x, 0, GALAXY_CENTER.z]} {...pick}>
+            <sphereGeometry args={[36, 16, 12]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+        </>
+      ) : null}
       {visible && showLabels ? (
         <>
           <group position={[GALAXY_CENTER.x, 0, GALAXY_CENTER.z]}>

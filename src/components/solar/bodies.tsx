@@ -1,6 +1,6 @@
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -26,15 +26,9 @@ import {
   type BodyId,
 } from "@/lib/solar/bodies";
 import { bodyWorldPos, simTimeRef, useSolar } from "@/lib/solar/store";
-import {
-  makeBlankTexture,
-  makeCloudTexture,
-  makeGlowTexture,
-  makeMoonTexture,
-  makePlanetBump,
-  makePlanetTexture,
-  makeRingTexture,
-} from "@/lib/solar/textures";
+import { makeGlowTexture, makeRingTexture } from "@/lib/solar/textures";
+import { requestTexture } from "@/lib/solar/texture-client";
+import type { TextureKind } from "@/lib/solar/texture-paint";
 import { PlanetMaterial } from "./planet-material";
 import { usePick } from "./use-pick";
 import { SunMaterial } from "./sun-material";
@@ -45,6 +39,40 @@ const dummy = new Object3D();
 function useDisposableTexture(factory: () => Texture) {
   const tex = useMemo(factory, [factory]);
   useEffect(() => () => tex.dispose(), [tex]);
+  return tex;
+}
+
+/**
+ * Request a procedural map from the worker pool, rendering without one until
+ * it lands. Painting all of these up front cost ~2.5s of frozen main thread on
+ * first mount; now a body shows as flat colour for a beat and gains its
+ * surface when the worker hands the pixels back.
+ */
+function useAsyncTexture(
+  kind: TextureKind,
+  body: string,
+  seed: number,
+  enabled = true,
+) {
+  const [tex, setTex] = useState<Texture | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    let created: Texture | null = null;
+    void requestTexture(kind, body, seed).then((next) => {
+      if (!live) {
+        next.dispose();
+        return;
+      }
+      created = next;
+      setTex(next);
+    });
+    return () => {
+      live = false;
+      created?.dispose();
+      setTex(null);
+    };
+  }, [kind, body, seed, enabled]);
   return tex;
 }
 
@@ -120,26 +148,15 @@ export function Star() {
 export function Planet({ body }: { body: BodyDef }) {
   const group = useRef<Group>(null);
   const spin = useRef<Group>(null);
-  const texFactory = useMemo(
-    () => () => makePlanetTexture(body.id, body.textureSeed),
-    [body.id, body.textureSeed],
-  );
-  const tex = useDisposableTexture(texFactory);
   const rocky = body.kind === "terrestrial";
-  const bumpFactory = useMemo(
-    () => () =>
-      rocky ? makePlanetBump(body.id, body.textureSeed) : makeBlankTexture(),
-    [body.id, body.textureSeed, rocky],
+  const tex = useAsyncTexture("planet", body.id, body.textureSeed);
+  const bump = useAsyncTexture("bump", body.id, body.textureSeed, rocky);
+  const cloudTex = useAsyncTexture(
+    "cloud",
+    body.id,
+    body.textureSeed + 9,
+    body.id === "earth",
   );
-  const bump = useDisposableTexture(bumpFactory);
-  const cloudFactory = useMemo(
-    () => () =>
-      body.id === "earth"
-        ? makeCloudTexture(body.textureSeed + 9)
-        : makeBlankTexture(),
-    [body.id, body.textureSeed],
-  );
-  const cloudTex = useDisposableTexture(cloudFactory);
   const select = useSolar((s) => s.select);
   const scaleMode = useSolar((s) => s.scaleMode);
   const pick = usePick(() => select(body.id));
@@ -171,6 +188,7 @@ export function Planet({ body }: { body: BodyDef }) {
           <sphereGeometry args={[radius, 96, 64]} />
           <PlanetMaterial
             map={tex}
+            fallbackColor={body.color}
             bumpMap={rocky ? bump : null}
             bumpScale={rocky ? 0.055 : 0}
             roughness={rocky ? 0.82 : 0.48}
@@ -179,7 +197,7 @@ export function Planet({ body }: { body: BodyDef }) {
             refDist={bodyOrbit(EARTH, scaleMode)}
           />
         </mesh>
-        {body.id === "earth" ? (
+        {body.id === "earth" && cloudTex ? (
           <mesh>
             <sphereGeometry args={[radius * 1.018, 64, 48]} />
             <meshStandardMaterial
@@ -262,11 +280,7 @@ function Satellite({
 }) {
   const ref = useRef<Mesh>(null);
   const scaleMode = useSolar((s) => s.scaleMode);
-  const factory = useMemo(
-    () => () => makeMoonTexture(sat.name.length * 13),
-    [sat.name],
-  );
-  const tex = useDisposableTexture(factory);
+  const tex = useAsyncTexture("moon", sat.name, sat.name.length * 13);
   const radius = satRadius(parent, sat, scaleMode);
   const orbit = satOrbit(parent, sat, scaleMode);
   useFrame(() => {
@@ -277,7 +291,12 @@ function Satellite({
   return (
     <mesh ref={ref}>
       <sphereGeometry args={[radius, 32, 24]} />
-      <meshStandardMaterial map={tex} roughness={0.9} />
+      <meshStandardMaterial
+        key={tex ? "mapped" : "flat"}
+        map={tex ?? undefined}
+        color={tex ? "#ffffff" : sat.color}
+        roughness={0.9}
+      />
     </mesh>
   );
 }
