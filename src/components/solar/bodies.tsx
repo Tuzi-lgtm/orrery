@@ -292,6 +292,7 @@ function Satellite({
     <mesh ref={ref}>
       <sphereGeometry args={[radius, 32, 24]} />
       <meshStandardMaterial
+        key={tex ? "mapped" : "flat"}
         map={tex ?? undefined}
         color={tex ? "#ffffff" : sat.color}
         roughness={0.9}

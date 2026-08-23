@@ -62,6 +62,11 @@ export function PlanetMaterial({
 
   return (
     <meshStandardMaterial
+      // Remount when the map arrives. The material is first compiled without
+      // one (the worker has not delivered yet), so the program has no USE_MAP;
+      // three does not recompile just because .map was assigned later, and the
+      // texture would never be sampled -- planets stayed flat white.
+      key={map ? "mapped" : "flat"}
       map={map ?? undefined}
       // three multiplies map by color, so the tint has to be white once the
       // map is in -- otherwise every surface would be shaded twice.
