@@ -7,13 +7,13 @@ import { GALAXY_CENTER } from "./galaxy";
 
 const OVERVIEW_VISUAL = new Vector3(0, 26, 68);
 const OVERVIEW_TRUE = new Vector3(0, 72, 188);
-const GALAXY_CAM = new Vector3(-40, 980, 720);
+const GALAXY_CAM = new Vector3(GALAXY_CENTER.x + 120, 1580, GALAXY_CENTER.z + 1180);
 const ORIGIN = new Vector3(0, 0, 0);
 const destCam = new Vector3();
 const destTarget = new Vector3();
 const deltaPos = new Vector3();
-const galaxyLook = new Vector3(GALAXY_CENTER.x * 0.4, 40, GALAXY_CENTER.z * 0.4);
-const SGR_CAM = new Vector3(GALAXY_CENTER.x + 28, 16, GALAXY_CENTER.z + 34);
+const galaxyLook = new Vector3(GALAXY_CENTER.x, 0, GALAXY_CENTER.z);
+const SGR_CAM = new Vector3(GALAXY_CENTER.x + 26, 9.5, GALAXY_CENTER.z + 20);
 const SGR_LOOK = new Vector3(GALAXY_CENTER.x, 0, GALAXY_CENTER.z);
 
 type OrbitLike = Object3D & {
@@ -92,7 +92,7 @@ export function CameraRig() {
     }
     camera.far = galaxyView ? 8000 : scaleMode === "true" ? 900 : 400;
     camera.updateProjectionMatrix();
-  }, [selectedId, focusGen, galaxyView, sgrASelected, scaleMode, camera, controls]);
+  }, [selectedId, focusGen, galaxyView, sgrASelected, scaleMode]);
 
   useFrame((_, delta) => {
     const oc = (controls as OrbitLike | null) ?? null;
@@ -105,12 +105,12 @@ export function CameraRig() {
       const toCam = sgrASelected ? SGR_CAM : GALAXY_CAM;
       const toLook = sgrASelected ? SGR_LOOK : galaxyLook;
       if (oc) {
-        oc.minDistance = sgrASelected ? 18 : 120;
+        oc.minDistance = sgrASelected ? 20 : 120;
         oc.maxDistance = 2800;
         oc.enabled = fly.current <= 0;
       }
       if (fly.current > 0) {
-        fly.current = Math.max(0, fly.current - d * (sgrASelected ? 1.2 : 0.95));
+        fly.current = Math.max(0, fly.current - d * (sgrASelected ? 1.35 : 1.25));
         const t = 1 - fly.current;
         const e = 1 - (1 - t) ** 2;
         applyLook(camera, oc, startCam.current, startTarget.current, toCam, toLook, e);
