@@ -11,6 +11,7 @@ import {
 } from "./bodies";
 import { CameraRig } from "./camera-rig";
 import { MilkyWay } from "./galaxy";
+import { GravityLensPass } from "./gravity-lens";
 
 function CameraFar({ far }: { far: number }) {
   const camera = useThree((s) => s.camera);
@@ -73,18 +74,21 @@ export function Scene() {
           enableDamping={!galaxyView}
           dampingFactor={0.08}
           minDistance={
-            sgrASelected ? 12 : galaxyView ? 120 : scaleMode === "true" ? 0.45 : 3.5
+            sgrASelected ? 20 : galaxyView ? 120 : scaleMode === "true" ? 0.45 : 3.5
           }
           maxDistance={maxDistance}
           enablePan={false}
-          autoRotate={selectedId === null && !sgrASelected && !paused}
+          autoRotate={
+            selectedId === null && !sgrASelected && !paused && !galaxyView
+          }
           autoRotateSpeed={galaxyView ? 0.12 : 0.18}
         />
         <EffectComposer>
+          <GravityLensPass />
           <Bloom
-            luminanceThreshold={sgrASelected ? 0.7 : galaxyView ? 0.82 : 1.15}
+            luminanceThreshold={sgrASelected ? 0.42 : galaxyView ? 0.82 : 1.15}
             mipmapBlur
-            intensity={galaxyView ? 0.55 : 0.95}
+            intensity={sgrASelected ? 1.05 : galaxyView ? 0.55 : 0.95}
             radius={0.85}
           />
         </EffectComposer>
