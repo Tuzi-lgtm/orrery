@@ -13,3 +13,7 @@ screenshots
 artifacts
 orrery.zip
 .node_modules.lock
+
+# Grok App Builder scaffolding, not app source
+.grok/
+AGENTS.md
