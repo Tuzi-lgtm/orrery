@@ -4,6 +4,7 @@ import { Vector3, type Object3D } from "three";
 import { SUN, bodyRadius, getBody } from "@/lib/solar/bodies";
 import { bodyWorldPos, useSolar } from "@/lib/solar/store";
 import { GALAXY_CENTER } from "@/lib/solar/galaxy-generate";
+import { FRAME } from "@/lib/solar/frame-order";
 
 const OVERVIEW_VISUAL = new Vector3(0, 26, 68);
 const OVERVIEW_TRUE = new Vector3(0, 72, 188);
@@ -178,7 +179,7 @@ export function CameraRig() {
     oc.target.add(deltaPos);
     lastPos.current.copy(destTarget);
     oc.update();
-  }, 50);
+  }, FRAME.camera);
 
   return null;
 }

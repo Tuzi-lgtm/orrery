@@ -26,6 +26,7 @@ import {
   type BodyId,
 } from "@/lib/solar/bodies";
 import { bodyWorldPos, simTimeRef, useSolar } from "@/lib/solar/store";
+import { FRAME } from "@/lib/solar/frame-order";
 import { makeGlowTexture, makeRingTexture } from "@/lib/solar/textures";
 import { requestTexture } from "@/lib/solar/texture-client";
 import type { TextureKind } from "@/lib/solar/texture-paint";
@@ -82,7 +83,7 @@ export function SimulationClock() {
     const d = Math.min(delta, 0.1);
     if (paused) return;
     simTimeRef.current += d * speed;
-  }, -2);
+  }, FRAME.clock);
   return null;
 }
 
@@ -109,7 +110,7 @@ export function Star() {
     pos.x = 0;
     pos.y = 0;
     pos.z = 0;
-  }, -1);
+  }, FRAME.bodies);
 
   return (
     <group ref={group}>
@@ -179,7 +180,7 @@ export function Planet({ body }: { body: BodyDef }) {
     if (spin.current) {
       spin.current.rotation.y = simTimeRef.current * body.spin * 0.35;
     }
-  }, -1);
+  }, FRAME.bodies);
 
   return (
     <group ref={group}>
@@ -287,7 +288,7 @@ function Satellite({
     if (!ref.current) return;
     const a = (simTimeRef.current / sat.period) * Math.PI * 2 + sat.phase;
     ref.current.position.set(Math.cos(a) * orbit, 0, Math.sin(a) * orbit);
-  }, -1);
+  }, FRAME.bodies);
   return (
     <mesh ref={ref}>
       <sphereGeometry args={[radius, 32, 24]} />
