@@ -308,6 +308,24 @@ export function getBody(id: BodyId) {
   return BODIES.find((b) => b.id === id)!;
 }
 
+/**
+ * Solve Kepler's equation M = E - e sin E for the eccentric anomaly.
+ *
+ * Newton-Raphson. At the eccentricities in this system (Mercury is the worst
+ * at 0.206) this converges in two or three passes; the cap is there so a bad
+ * input cannot spin forever.
+ */
+function eccentricAnomaly(meanAnomaly: number, e: number) {
+  if (e < 1e-6) return meanAnomaly;
+  let E = meanAnomaly;
+  for (let i = 0; i < 8; i++) {
+    const err = E - e * Math.sin(E) - meanAnomaly;
+    if (Math.abs(err) < 1e-10) break;
+    E -= err / (1 - e * Math.cos(E));
+  }
+  return E;
+}
+
 export function orbitPoint(
   body: BodyDef,
   time: number,
@@ -321,8 +339,14 @@ export function orbitPoint(
     out.z = 0;
     return out;
   }
-  const angle = (time / body.period) * Math.PI * 2 + body.phase;
   const e = body.eccentricity;
+  // Position on the ellipse is parameterised by the eccentric anomaly, with
+  // the Sun at the focus. Time advances the MEAN anomaly uniformly; stepping
+  // the eccentric anomaly uniformly instead -- as this did -- sweeps equal
+  // angles rather than equal areas, so an eccentric world moved at a constant
+  // angular rate and ignored Kepler's second law.
+  const meanAnomaly = (time / body.period) * Math.PI * 2 + body.phase;
+  const angle = eccentricAnomaly(meanAnomaly, e);
   const b = a * Math.sqrt(1 - e * e);
   const x = Math.cos(angle) * a - a * e;
   const z = Math.sin(angle) * b;
