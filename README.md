@@ -87,16 +87,38 @@ Optional login uses a local PGLite database. A real database is not required.
 | `src/components/solar/bodies.tsx` | Sun, planets, moons, rings, trails |
 | `src/components/solar/planet-material.tsx` | Live close-up surface detail |
 | `src/components/solar/sun-material.tsx` | Animated photosphere |
-| `src/components/solar/camera-rig.tsx` | Click-to-focus fly-ins |
+| `src/components/solar/camera-rig.tsx` | Click-to-focus fly-ins, orbit limits |
 | `src/components/solar/hud.tsx` | Controls and info panel |
-| `src/lib/solar/bodies.ts` | Planet data and true-size math |
+| `src/components/solar/galaxy.tsx` | Milky Way view |
+| `src/components/solar/black-hole.tsx` | Sagittarius A* disc and photon ring |
+| `src/components/solar/gravity-lens.tsx` | Screen-space lensing pass |
+| `src/lib/solar/bodies.ts` | Planet data, Kepler orbits, true-size math |
 | `src/lib/solar/store.ts` | Pause, speed, selected world, scale, mute |
-| `src/lib/solar/textures.ts` | Procedural maps |
+| `src/lib/solar/galaxy-generate.ts` | Star / dust / bar / core generation |
+| `src/lib/solar/texture-paint.ts` | Procedural maps, painted pixel by pixel |
 | `src/lib/solar/audio.ts` | OM drone / whoosh |
+
+Planet textures and the galaxy point clouds are generated in web workers
+(`*-worker.ts`, dispatched through `worker-pool.ts`), so neither blocks the
+first frame. The galaxy is only built once you open that view.
 
 ## Controls
 
 - Drag to orbit, pinch/scroll to zoom
 - Click a planet or use the world list to focus
-- Space pause, `[` `]` speed, `Esc` system view, `M` mute
+
+| Key | Does |
+|---|---|
+| `Space` | Pause / resume |
+| `[` `]` | Halve / double speed (0.25x–16x) |
+| `Esc` | Back out: Sgr A* → Milky Way → system view |
+| `0`–`8` | Jump to the Sun, then Mercury outward to Neptune |
+| `G` | Milky Way view |
+| `L` | World list |
+| `M` | Mute |
+
+Shortcuts are ignored while a modifier is held, so browser bindings still work.
+
 - **True size** uses real diameter ratios. Distances stay compressed so Neptune fits.
+- Orbits follow Kepler's second law, so eccentric worlds visibly speed up near
+  the Sun — Mercury runs 2.3x faster at perihelion than at aphelion.

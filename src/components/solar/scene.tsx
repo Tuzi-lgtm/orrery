@@ -24,13 +24,10 @@ function CameraFar({ far }: { far: number }) {
 
 export function Scene() {
   const selectedId = useSolar((s) => s.selectedId);
-  const scaleMode = useSolar((s) => s.scaleMode);
   const galaxyView = useSolar((s) => s.galaxyView);
   const sgrASelected = useSolar((s) => s.sgrASelected);
   const paused = useSolar((s) => s.paused);
   const dismissHint = useSolar((s) => s.dismissHint);
-  const maxDistance = galaxyView ? 2800 : scaleMode === "true" ? 520 : 150;
-
   return (
     <Canvas
       camera={{ position: [0, 26, 68], fov: 42, near: 0.08, far: 8000 }}
@@ -69,14 +66,12 @@ export function Scene() {
         </group>
         <MilkyWay />
         <CameraRig />
+        {/* min/max distance are owned by CameraRig, which rewrites them every
+            frame -- setting them here too would just be dead configuration. */}
         <OrbitControls
           makeDefault
           enableDamping={!galaxyView}
           dampingFactor={0.08}
-          minDistance={
-            sgrASelected ? 20 : galaxyView ? 120 : scaleMode === "true" ? 0.45 : 3.5
-          }
-          maxDistance={maxDistance}
           enablePan={false}
           autoRotate={
             selectedId === null && !sgrASelected && !paused && !galaxyView
@@ -84,7 +79,10 @@ export function Scene() {
           autoRotateSpeed={galaxyView ? 0.12 : 0.18}
         />
         <EffectComposer>
-          <GravityLensPass />
+          {/* A full-screen convolution pass that only bends light around
+              Sgr A*. Mounted with the view so solar mode does not run it
+              every frame just to return the input untouched. */}
+          {galaxyView ? <GravityLensPass /> : null}
           <Bloom
             luminanceThreshold={sgrASelected ? 0.42 : galaxyView ? 0.82 : 1.15}
             mipmapBlur

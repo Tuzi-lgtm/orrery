@@ -1,7 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Vector3, type Object3D } from "three";
-import { bodyRadius, getBody } from "@/lib/solar/bodies";
+import { SUN, bodyRadius, getBody } from "@/lib/solar/bodies";
 import { bodyWorldPos, useSolar } from "@/lib/solar/store";
 import { GALAXY_CENTER } from "@/lib/solar/galaxy-generate";
 
@@ -122,7 +122,11 @@ export function CameraRig() {
 
     const comingHome = fly.current > 0 && camera.position.length() > 160;
     if (oc) {
-      oc.minDistance = scaleMode === "true" ? 0.45 : 3.5;
+      // Clear the surface of whatever the controls are orbiting. A flat
+      // minimum let you fly inside the gas giants in true-size mode, where
+      // Jupiter's radius is 1.98 and the Sun's is 19.7 against a floor of 0.45.
+      const focus = selectedId ? getBody(selectedId) : SUN;
+      oc.minDistance = Math.max(bodyRadius(focus, scaleMode) * 1.35, 0.05);
       oc.maxDistance = comingHome ? 2800 : scaleMode === "true" ? 520 : 150;
     }
 
