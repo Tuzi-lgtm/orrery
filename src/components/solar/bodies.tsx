@@ -36,6 +36,7 @@ import {
   makeRingTexture,
 } from "@/lib/solar/textures";
 import { PlanetMaterial } from "./planet-material";
+import { usePick } from "./use-pick";
 import { SunMaterial } from "./sun-material";
 
 const scratch = { x: 0, y: 0, z: 0 };
@@ -62,14 +63,16 @@ export function Star() {
   const glowTex = useDisposableTexture(makeGlowTexture);
   const select = useSolar((s) => s.select);
   const scaleMode = useSolar((s) => s.scaleMode);
-  const pointer = useRef({ x: 0, y: 0 });
+  const pick = usePick(() => select("sun"));
   const radius = bodyRadius(SUN, scaleMode);
   const glow = scaleMode === "true" ? radius * 4.4 : 14;
   const haze = scaleMode === "true" ? radius * 10 : 32;
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (!group.current) return;
-    group.current.rotation.y += delta * SUN.spin * 0.15;
+    // Derived from sim time, not accumulated delta, so pause holds the star
+    // still and the speed control governs it. Same rate as before at 1x.
+    group.current.rotation.y = simTimeRef.current * SUN.spin * 0.15;
     let pos = bodyWorldPos.get("sun");
     if (!pos) {
       pos = { x: 0, y: 0, z: 0 };
@@ -82,25 +85,7 @@ export function Star() {
 
   return (
     <group ref={group}>
-      <mesh
-        onPointerDown={(e) => {
-          pointer.current.x = e.clientX;
-          pointer.current.y = e.clientY;
-        }}
-        onClick={(e) => {
-          const dx = e.clientX - pointer.current.x;
-          const dy = e.clientY - pointer.current.y;
-          if (dx * dx + dy * dy > 25) return;
-          e.stopPropagation();
-          select("sun");
-        }}
-        onPointerOver={() => {
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = "";
-        }}
-      >
+      <mesh {...pick}>
         <sphereGeometry args={[radius, 64, 64]} />
         <SunMaterial />
       </mesh>
@@ -157,10 +142,10 @@ export function Planet({ body }: { body: BodyDef }) {
   const cloudTex = useDisposableTexture(cloudFactory);
   const select = useSolar((s) => s.select);
   const scaleMode = useSolar((s) => s.scaleMode);
-  const pointer = useRef({ x: 0, y: 0 });
+  const pick = usePick(() => select(body.id));
   const radius = bodyRadius(body, scaleMode);
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     const g = group.current;
     if (!g) return;
     orbitPoint(body, simTimeRef.current, scratch, scaleMode);
@@ -175,32 +160,14 @@ export function Planet({ body }: { body: BodyDef }) {
       pos.z = scratch.z;
     }
     if (spin.current) {
-      spin.current.rotation.y += delta * body.spin * 0.35;
+      spin.current.rotation.y = simTimeRef.current * body.spin * 0.35;
     }
   }, -1);
 
   return (
     <group ref={group}>
       <group ref={spin} rotation={[0, 0, body.tilt]}>
-        <mesh
-          onPointerDown={(e) => {
-            pointer.current.x = e.clientX;
-            pointer.current.y = e.clientY;
-          }}
-          onClick={(e) => {
-            const dx = e.clientX - pointer.current.x;
-            const dy = e.clientY - pointer.current.y;
-            if (dx * dx + dy * dy > 25) return;
-            e.stopPropagation();
-            select(body.id);
-          }}
-          onPointerOver={() => {
-            document.body.style.cursor = "pointer";
-          }}
-          onPointerOut={() => {
-            document.body.style.cursor = "";
-          }}
-        >
+        <mesh {...pick}>
           <sphereGeometry args={[radius, 96, 64]} />
           <PlanetMaterial
             map={tex}
@@ -425,8 +392,8 @@ export function AsteroidBelt() {
     inst.instanceMatrix.needsUpdate = true;
   }, [count, inner, outer, scaleMode]);
 
-  useFrame((_, delta) => {
-    if (mesh.current) mesh.current.rotation.y += delta * 0.012;
+  useFrame(() => {
+    if (mesh.current) mesh.current.rotation.y = simTimeRef.current * 0.012;
   });
 
   return (

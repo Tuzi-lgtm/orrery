@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { BODIES, EARTH, KIND_LABEL, type BodyId } from "@/lib/solar/bodies";
@@ -23,6 +23,10 @@ import {
 import { galaxyTimeRef, simTimeRef, useSolar } from "@/lib/solar/store";
 import { cn } from "@/lib/utils";
 import { AuthChip } from "./auth-chip";
+
+/** Shared by the slider and the [ ] keys so the two cannot drift apart. */
+const MIN_SPEED = 0.25;
+const MAX_SPEED = 16;
 
 export function Hud() {
   const paused = useSolar((s) => s.paused);
@@ -66,6 +70,8 @@ export function Hud() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Ctrl+L, Cmd+M and friends belong to the browser, not to us.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.code === "Space") {
         e.preventDefault();
         togglePause();
@@ -74,9 +80,9 @@ export function Hud() {
         else if (galaxyView) setGalaxyView(false);
         else select(null);
       } else if (e.key === "[") {
-        setSpeed(Math.max(0.25, speed / 2));
+        setSpeed(Math.max(MIN_SPEED, speed / 2));
       } else if (e.key === "]") {
-        setSpeed(Math.min(32, speed * 2));
+        setSpeed(Math.min(MAX_SPEED, speed * 2));
       } else if (e.key === "m" || e.key === "M") {
         toggleMuted();
       } else if (e.key === "l" || e.key === "L") {
@@ -230,8 +236,8 @@ export function Hud() {
               {formatSpeed(speed)}
             </span>
             <Slider
-              min={0.25}
-              max={16}
+              min={MIN_SPEED}
+              max={MAX_SPEED}
               step={0.25}
               value={[speed]}
               onValueChange={(v) => setSpeed(v[0] ?? 1)}
@@ -288,30 +294,40 @@ export function Hud() {
 }
 
 function YearReadout() {
-  const galaxyView = useSolar((s) => s.galaxyView);
-  const [label, setLabel] = useState("0.00 yr");
+  const ref = useRef<HTMLSpanElement>(null);
+
+  // Drives one text node from the animation frame rather than calling
+  // setState 20x/second, which re-rendered this component on a timer whether
+  // or not the value had changed.
   useEffect(() => {
+    let frame = 0;
+    let shown = "";
     const tick = () => {
-      if (useSolar.getState().galaxyView) {
-        const myr = galaxyTimeRef.current;
-        setLabel(
-          myr >= 1000 ? `${(myr / 1000).toFixed(2)} Gyr` : `${myr.toFixed(2)} Myr`,
-        );
-      } else {
-        const years = simTimeRef.current / EARTH.period;
-        setLabel(`${years.toFixed(2)} yr`);
+      frame = requestAnimationFrame(tick);
+      const el = ref.current;
+      if (!el) return;
+      const myr = galaxyTimeRef.current;
+      const label = useSolar.getState().galaxyView
+        ? myr >= 1000
+          ? `${(myr / 1000).toFixed(2)} Gyr`
+          : `${myr.toFixed(2)} Myr`
+        : `${(simTimeRef.current / EARTH.period).toFixed(2)} yr`;
+      if (label !== shown) {
+        el.textContent = label;
+        shown = label;
       }
     };
-    tick();
-    const id = window.setInterval(tick, 50);
-    return () => window.clearInterval(id);
-  }, [galaxyView]);
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   return (
     <span
+      ref={ref}
       className="min-w-24 text-xs text-muted tabular-nums"
       aria-label="Elapsed time"
     >
-      {label}
+      0.00 yr
     </span>
   );
 }

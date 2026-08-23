@@ -14,6 +14,7 @@ import {
   MathUtils,
 } from "three";
 import { GALAXY_MYR_PER_SEC, galaxyTimeRef, useSolar } from "@/lib/solar/store";
+import { usePick } from "./use-pick";
 
 export const GALAXY_CENTER = { x: -460, y: 0, z: -90 };
 export const GALAXY_RADIUS = 900;
@@ -25,7 +26,14 @@ const GALAXY_SUN_ANGLE = Math.atan2(-GALAXY_CENTER.z, -GALAXY_CENTER.x);
 const GALAXY_BAR_ANGLE = GALAXY_SUN_ANGLE + 0.48;
 const GALAXY_ARM_ROT = GALAXY_BAR_ANGLE;
 const GALAXY_BAR_LEN = GALAXY_RADIUS * 0.2;
-const BAR_PERIOD = 28 + GALAXY_BAR_LEN * 0.12;
+/**
+ * Myr per revolution of the spiral pattern. Arms and the bar are baked into
+ * the point positions, so they are structures, not free-floating stars: every
+ * cloud has to turn at this one rigid rate or they shear apart. They used to
+ * turn differentially (`28 + r * 0.12`), which wound the arms up and smeared
+ * the bar into a ring within ~24 Myr of viewing — about 24s at 1x, 1.5s at 16x
+ * — while the painted arms in the volume shader stayed put at this period.
+ */
 const GALAXY_PATTERN_PERIOD = 28 + GALAXY_RADIUS * 0.45 * 0.12;
 
 const STAR_VERT = /* glsl */ `
@@ -34,14 +42,13 @@ attribute float aSize;
 uniform float uTime;
 uniform vec3 uCenter;
 uniform float uSize;
+uniform float uPattern;
 varying vec3 vColor;
 varying vec3 vWorld;
 void main() {
   vColor = color;
   vec3 p = position - uCenter;
-  float r = length(p.xz);
-  float period = 28.0 + r * 0.12;
-  float ang = -uTime * 6.2831853 / period;
+  float ang = -uTime * 6.2831853 / uPattern;
   float c = cos(ang);
   float s = sin(ang);
   vec3 q = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z) + uCenter;
@@ -459,6 +466,7 @@ function GalaxyCloud({
           uCamera: { value: CAM_POS },
           uSize: { value: size },
           uOpacity: { value: opacity },
+          uPattern: { value: GALAXY_PATTERN_PERIOD },
         }}
         transparent
         depthWrite={false}
@@ -623,37 +631,17 @@ function GalaxyVolume({ fadeRef }: { fadeRef: { current: number } }) {
   );
 }
 
-const BAR_STAR_VERT = /* glsl */ `
-attribute vec3 color;
-attribute float aSize;
-uniform float uSize;
-uniform float uTime;
-uniform float uPeriod;
-varying vec3 vColor;
-void main() {
-  vColor = color;
-  float ang = -uTime * 6.2831853 / uPeriod;
-  float c = cos(ang);
-  float s = sin(ang);
-  vec3 p = vec3(c * position.x - s * position.z, position.y, s * position.x + c * position.z);
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  gl_Position = projectionMatrix * mv;
-  gl_PointSize = max(aSize * uSize * (240.0 / max(-mv.z, 1.0)), 1.2);
-}
-`;
-
 const BAR_VERT = /* glsl */ `
 varying vec3 vLocal;
 varying vec3 vWorld;
 uniform float uTime;
+uniform float uPattern;
 uniform vec3 uCenter;
 void main() {
   vLocal = position;
   vec3 world = (modelMatrix * vec4(position, 1.0)).xyz;
   vec3 p = world - uCenter;
-  float r = length(p.xz);
-  float period = 28.0 + r * 0.12;
-  float ang = -uTime * 6.2831853 / period;
+  float ang = -uTime * 6.2831853 / uPattern;
   float c = cos(ang);
   float s = sin(ang);
   vec3 q = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z) + uCenter;
@@ -714,6 +702,7 @@ function BarCluster({ fadeRef }: { fadeRef: { current: number } }) {
               uCenter: { value: GALAXY_CENTER_VEC },
               uCamera: { value: CAM_POS },
               uOpacity: { value: 0 },
+              uPattern: { value: GALAXY_PATTERN_PERIOD },
             }}
             transparent
             depthWrite={false}
@@ -733,6 +722,7 @@ function BarCluster({ fadeRef }: { fadeRef: { current: number } }) {
               uCenter: { value: GALAXY_CENTER_VEC },
               uCamera: { value: CAM_POS },
               uOpacity: { value: 0 },
+              uPattern: { value: GALAXY_PATTERN_PERIOD },
             }}
             transparent
             depthWrite={false}
@@ -757,7 +747,7 @@ export function MilkyWay() {
   const sgrASelected = useSolar((s) => s.sgrASelected);
   const selectSgrA = useSolar((s) => s.selectSgrA);
   const fade = useRef(0);
-  const pointer = useRef({ x: 0, y: 0 });
+  const pick = usePick(() => selectSgrA(!sgrASelected));
 
   const stars = useMemo(() => makeCloud(280000, "star", 4), []);
   const dust = useMemo(() => makeCloud(42000, "dust", 19), []);
@@ -791,8 +781,10 @@ export function MilkyWay() {
       const cz = GALAXY_CENTER.z;
       const r = Math.hypot(cx, cz);
       const base = Math.atan2(-cz, -cx);
-      const period = 28 + r * 0.12;
-      const ang = base - (galaxyTimeRef.current / period) * Math.PI * 2;
+      // Same rigid pattern as the clouds, so the Sun stays pinned to the
+      // Orion spur it is drawn sitting in.
+      const ang =
+        base - (galaxyTimeRef.current / GALAXY_PATTERN_PERIOD) * Math.PI * 2;
       here.current.position.set(cx + Math.cos(ang) * r, 0, cz + Math.sin(ang) * r);
     }
     const dSgr = camera.position.distanceTo(GALAXY_CENTER_VEC);
@@ -825,26 +817,7 @@ export function MilkyWay() {
       />
       <GalaxyCloud geometry={core} size={0.22} opacity={0.7} fadeRef={fade} />
       <BlackHole />
-      <mesh
-        position={[GALAXY_CENTER.x, 0, GALAXY_CENTER.z]}
-        onPointerDown={(e) => {
-          pointer.current.x = e.clientX;
-          pointer.current.y = e.clientY;
-        }}
-        onClick={(e) => {
-          const dx = e.clientX - pointer.current.x;
-          const dy = e.clientY - pointer.current.y;
-          if (dx * dx + dy * dy > 25) return;
-          e.stopPropagation();
-          selectSgrA(!sgrASelected);
-        }}
-        onPointerOver={() => {
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = "";
-        }}
-      >
+      <mesh position={[GALAXY_CENTER.x, 0, GALAXY_CENTER.z]} {...pick}>
         <sphereGeometry args={[36, 16, 12]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
@@ -1040,10 +1013,9 @@ function BlackHole() {
   const billboard = useRef<Group>(null);
   const { camera } = useThree();
 
-  useFrame((_, delta) => {
-    const { paused, speed } = useSolar.getState();
-    if (diskMat.current && !paused) {
-      diskMat.current.uniforms.uTime.value += delta * speed * 0.42;
+  useFrame(() => {
+    if (diskMat.current) {
+      diskMat.current.uniforms.uTime.value = galaxyTimeRef.current * 0.42;
     }
     if (billboard.current) billboard.current.quaternion.copy(camera.quaternion);
   });
