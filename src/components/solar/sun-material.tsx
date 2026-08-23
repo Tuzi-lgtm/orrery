@@ -1,6 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { Color, ShaderMaterial } from "three";
+import { simTimeRef } from "@/lib/solar/store";
 
 const vertex = /* glsl */ `
   varying vec3 vPos;
@@ -97,8 +98,10 @@ export function SunMaterial() {
     [],
   );
 
-  useFrame((_, delta) => {
-    if (ref.current) ref.current.uniforms.uTime.value += Math.min(delta, 0.05);
+  // Photosphere churn runs on sim time so pause freezes the surface and the
+  // speed control drives it, matching orbits and spin. Same rate at 1x.
+  useFrame(() => {
+    if (ref.current) ref.current.uniforms.uTime.value = simTimeRef.current;
   });
 
   return (
