@@ -3,7 +3,7 @@ import { wrapEffect } from "@react-three/postprocessing";
 import { BlendFunction, Effect, EffectAttribute } from "postprocessing";
 import { useMemo, useRef } from "react";
 import { Uniform, Vector2, Vector3 } from "three";
-import { GALAXY_CENTER_VEC } from "./galaxy";
+import { GALAXY_CENTER_VEC } from "./galaxy-space";
 import { useSolar } from "@/lib/solar/store";
 
 const FRAG = /* glsl */ `
